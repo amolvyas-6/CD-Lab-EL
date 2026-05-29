@@ -26,17 +26,18 @@ Browser (React + Vite + TypeScript)
 3. **Opt IR** — `opt -passes=mem2reg,instcombine`
 4. **Liveness** — Backward data-flow + CFG visualisation (Cytoscape.js)
 5. **Interference** — Force-directed interference graph (Cytoscape.js)
-6. **Allocation** — All 4 allocators run; Gantt chart for Linear Scan
+6. **Allocation** — All 4 allocators run; step-by-step analytics, register
+   maps, Gantt chart for Linear Scan
 7. **Assembly** — Annotated `.s` output, spill instructions highlighted
 8. **Comparison** — Metric cards + Recharts bar charts
 
 ---
 
-## Quick Start (Local — No Docker)
+## Quick Start
 
 ### Requirements
 - Python 3.11+
-- Node.js 20+
+- Node.js 18+
 - LLVM toolchain: `clang`, `opt`, `llc`
 
 ```bash
@@ -47,15 +48,27 @@ sudo apt install clang llvm
 brew install llvm
 ```
 
-### Backend
+### Build & Run (via scripts)
+
 ```bash
+# Install all dependencies
+./build.sh
+
+# Start both backend and frontend
+./run.sh
+
+# Open http://localhost:5173
+```
+
+### Manual Start
+
+```bash
+# Backend
 cd backend
 pip install -r requirements.txt
 uvicorn main:app --reload --port 8000
-```
 
-### Frontend
-```bash
+# Frontend (separate terminal)
 cd frontend
 npm install
 npm run dev
@@ -74,18 +87,61 @@ docker compose up
 
 ---
 
+## Project Structure
+
+```
+register-alloc-sim-v2/
+├── build.sh                   # Install dependencies
+├── run.sh                     # Start both servers
+├── DESIGN.md                  # Architecture & approach
+├── IMPLEMENTATION.md          # LLVM details & code walkthrough
+├── EVALUATION.md              # Metrics, comparison, test cases
+├── backend/
+│   ├── main.py                # FastAPI endpoints
+│   ├── llvm_pipeline.py       # clang/opt/llc subprocess wrappers
+│   ├── ir_parser.py           # LLVM IR → basic blocks
+│   ├── liveness.py            # Backward data-flow solver
+│   ├── interference.py        # Interference graph construction
+│   ├── graph_coloring.py      # Chaitin-Briggs allocator
+│   ├── linear_scan.py         # Poletto-Sarkar allocator
+│   ├── asm_parser.py          # Assembly metric extraction
+│   ├── schemas.py             # Pydantic request/response models
+│   └── presets.py             # 6 built-in C programs
+├── frontend/
+│   └── src/
+│       ├── App.tsx             # Pipeline stage router
+│       ├── components/         # 9 visualization components
+│       ├── store/              # Zustand state management
+│       └── types.ts            # TypeScript interfaces
+├── testcases/
+│   ├── 01_simple.c            # Baseline (no spills)
+│   ├── 02_loop_sum.c          # Loop-carried liveness
+│   ├── 03_gcd.c               # Moderate pressure
+│   ├── 04_bubble_sort.c       # High pressure
+│   ├── 05_fibonacci.c         # 4 live vars
+│   └── 06_pressure_bomb.c     # Failure case (forced spills)
+└── tests/
+    ├── test_graph_coloring.py  # 5 unit tests
+    ├── test_linear_scan.py     # 5 unit tests
+    ├── test_liveness.py        # 3 unit tests
+    └── test_llvm_pipeline.py   # 4 integration tests
+```
+
+---
+
 ## Tests
 
 ```bash
-# Backend unit tests (no LLVM required)
+# Run all tests
 cd backend
-python tests/test_graph_coloring.py
-python tests/test_linear_scan.py
-python tests/test_liveness.py
-
-# With pytest
 pip install pytest
-pytest ../tests/
+pytest ../tests/ -v
+
+# Or individually
+python ../tests/test_graph_coloring.py
+python ../tests/test_linear_scan.py
+python ../tests/test_liveness.py
+python ../tests/test_llvm_pipeline.py   # requires clang + llc
 ```
 
 ---

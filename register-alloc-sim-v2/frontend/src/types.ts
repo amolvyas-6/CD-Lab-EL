@@ -32,10 +32,26 @@ export interface AllocatorResult {
   registerCount: number;
   instructionCount: number;
   rawStats: string;
+  // Detailed algorithm step data (for custom allocators)
+  steps: AlgorithmStep[];
+  // Live interval data (for linear scan Gantt chart)
+  intervals: LiveInterval[];
+}
+
+export interface AlgorithmStep {
+  phase?: string;
+  description: string;
+  stackState?: string[];
+  remaining?: string[];
+  activeList?: string[];
+  assigned?: Record<string, string>;
+  node?: string;
+  register?: string;
+  [key: string]: unknown;
 }
 
 export interface AllocateResponse {
-  results: Record<AllocatorId, AllocatorResult>;
+  results: Record<string, AllocatorResult>;
   error?: string;
 }
 

@@ -1,5 +1,5 @@
 """
-LLVM IR parser using llvmlite.
+LLVM IR parser.
 
 Parses a .ll file into Python BasicBlock objects, extracts the CFG,
 and computes use/def sets for each block.
@@ -25,14 +25,25 @@ class IRBasicBlock:
 
 # ── Regex patterns for LLVM IR ─────────────────────────────────────────────────
 
-_LABEL_RE = re.compile(r"^(\w[\w.]*):$")
-_RESULT_RE = re.compile(r"^\s+(%[\w.]+)\s*=")           # instructions that define a value
-_USE_RE = re.compile(r"%[\w.]+")                         # any SSA value reference
-_BR_UNCOND = re.compile(r"^\s+br\s+label\s+%(\w[\w.]*)")
-_BR_COND = re.compile(r"^\s+br\s+i1\s+%[\w.]+,\s*label\s+%(\w[\w.]*),\s*label\s+%(\w[\w.]*)")
-_RET_RE = re.compile(r"^\s+ret\b")
-_PHI_RE = re.compile(r"^\s+(%[\w.]+)\s*=\s*phi\b")
-_PHI_FROM_RE = re.compile(r"\[\s*(%[\w.]+)\s*,\s*%(\w[\w.]*)\s*\]")
+# Labels: match "label:" optionally followed by whitespace and/or a ; comment
+# Handles both "entry:" and "while.cond:                    ; preds = ..."
+_LABEL_RE    = re.compile(r"^([\w][\w.]*)\s*:\s*(?:;.*)?$")
+
+_RESULT_RE   = re.compile(r"^\s*(%[\w.]+)\s*=")
+_USE_RE      = re.compile(r"%[\w.]+")
+# Unconditional branch
+_BR_UNCOND   = re.compile(r"^\s*br\s+label\s+%([\w.]+)")
+# Conditional branch
+_BR_COND     = re.compile(r"^\s*br\s+i1\s+%[\w.]+,\s*label\s+%([\w.]+),\s*label\s+%([\w.]+)")
+_RET_RE      = re.compile(r"^\s*ret\b")
+
+# Phi node predecessor labels: in  "[ %val, %block ]" or "[ 1, %block ]",
+# the SECOND item is ALWAYS a block label — never an SSA value to track.
+# Match any pair [ anything, %label ] to extract the label.
+_PHI_PRED_RE = re.compile(r"\[\s*[^,\[\]]+,\s*%([\w.]+)\s*\]")
+
+# Branch target labels (for br instructions) — also not SSA values
+_BR_LABEL_RE = re.compile(r"\blabel\s+%([\w.]+)")
 
 
 def parse_ir(ir_text: str) -> List[IRBasicBlock]:
@@ -43,7 +54,6 @@ def parse_ir(ir_text: str) -> List[IRBasicBlock]:
     blocks: List[IRBasicBlock] = []
     block_map: Dict[str, IRBasicBlock] = {}
 
-    # Split the IR into function bodies (skip module-level metadata)
     lines = ir_text.splitlines()
     current_block: Optional[IRBasicBlock] = None
     in_function = False
@@ -75,9 +85,18 @@ def parse_ir(ir_text: str) -> List[IRBasicBlock]:
             current_block = None
             continue
 
+        stripped = line.strip()
+
+        # Skip metadata lines (start with !)
+        if stripped.startswith("!"):
+            continue
+
         # Named label → start new block
-        m = _LABEL_RE.match(line.strip())
-        if m:
+        # Labels have NO leading whitespace in LLVM IR (unlike instructions)
+        # Must check the RAW line, not stripped, to avoid matching indented text
+        m = _LABEL_RE.match(stripped)
+        raw_stripped = line.lstrip()
+        if m and not line.startswith(" ") and not line.startswith("\t"):
             _finish_block()
             label = m.group(1)
             current_block = IRBasicBlock(
@@ -88,8 +107,8 @@ def parse_ir(ir_text: str) -> List[IRBasicBlock]:
             block_index += 1
             continue
 
-        # First instruction inside a function (implicit "entry" block, no label)
-        if in_function and current_block is None and line.strip():
+        # First instruction inside a function (implicit "entry" block, no explicit label)
+        if in_function and current_block is None and stripped:
             current_block = IRBasicBlock(
                 id=f"BB{block_index}",
                 label="entry",
@@ -97,8 +116,11 @@ def parse_ir(ir_text: str) -> List[IRBasicBlock]:
             )
             block_index += 1
 
-        if current_block is not None and line.strip():
-            current_block.instructions.append(line.strip())
+        if current_block is not None and stripped:
+            # Strip trailing metadata tokens like ", !llvm.loop !6"
+            clean = re.sub(r",?\s*![\w.]+ !\d+", "", stripped).strip()
+            if clean:
+                current_block.instructions.append(clean)
 
     # Wire up CFG edges
     _build_cfg_edges(blocks, block_map)
@@ -108,20 +130,36 @@ def parse_ir(ir_text: str) -> List[IRBasicBlock]:
 def _compute_use_def(block: IRBasicBlock):
     """
     Compute use and def sets for a basic block.
-    For phi nodes, the uses come from predecessor blocks (handled separately).
+
+    Rules:
+    - Phi node [ %value, %block_label ] → %value is a use, %block_label is NOT
+    - Branch `label %target` → %target is NOT an SSA value use
+    - Everything else: %xxx references are uses (if not yet defined in this block)
     """
     defined: Set[str] = set()
     used: Set[str] = set()
 
     for instr in block.instructions:
-        # Find all SSA value references in this instruction
+        # Collect all %xxx references
         all_refs = set(_USE_RE.findall(instr))
+
+        # Remove phi predecessor labels — they are block names, not SSA values
+        phi_preds = {f"%{lb}" for lb in _PHI_PRED_RE.findall(instr)}
+        all_refs -= phi_preds
+
+        # Remove branch target labels — also block names, not SSA values
+        br_labels = {f"%{lb}" for lb in _BR_LABEL_RE.findall(instr)}
+        all_refs -= br_labels
 
         # Find what this instruction defines
         def_match = _RESULT_RE.match(instr)
         defined_here = def_match.group(1) if def_match else None
 
-        # Uses = refs that are not yet defined in this block
+        # Remove the LHS from uses
+        if defined_here:
+            all_refs.discard(defined_here)
+
+        # Use = referenced before defined in this block
         for ref in all_refs:
             if ref not in defined:
                 used.add(ref)
@@ -144,8 +182,9 @@ def _build_cfg_edges(blocks: List[IRBasicBlock], block_map: Dict[str, IRBasicBlo
         m = _BR_UNCOND.match(last)
         if m:
             tgt = m.group(1)
-            block.successors.append(tgt)
-            if tgt in block_map:
+            if tgt not in block.successors:
+                block.successors.append(tgt)
+            if tgt in block_map and block.label not in block_map[tgt].predecessors:
                 block_map[tgt].predecessors.append(block.label)
             continue
 
@@ -153,8 +192,9 @@ def _build_cfg_edges(blocks: List[IRBasicBlock], block_map: Dict[str, IRBasicBlo
         m = _BR_COND.match(last)
         if m:
             for tgt in (m.group(1), m.group(2)):
-                block.successors.append(tgt)
-                if tgt in block_map:
+                if tgt not in block.successors:
+                    block.successors.append(tgt)
+                if tgt in block_map and block.label not in block_map[tgt].predecessors:
                     block_map[tgt].predecessors.append(block.label)
             continue
 

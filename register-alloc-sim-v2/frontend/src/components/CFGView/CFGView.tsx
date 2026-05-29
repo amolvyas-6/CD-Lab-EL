@@ -31,45 +31,51 @@ export default function CFGView({ blocks }: CFGViewProps) {
       }
     }
 
-    cyRef.current = cytoscape({
-      container: containerRef.current,
-      elements,
-      style: [
-        {
-          selector: 'node',
-          style: {
-            'background-color': '#191d29',
-            'border-color': '#6c8dfa',
-            'border-width': 1.5,
-            'color': '#e8ecf4',
-            'font-size': 9,
-            'font-family': 'JetBrains Mono, monospace',
-            'label': 'data(id)',
-            'text-valign': 'center',
-            'text-halign': 'center',
-            'text-wrap': 'wrap',
-            'width': 80,
-            'height': 40,
-            'shape': 'round-rectangle',
+    try {
+      cyRef.current = cytoscape({
+        container: containerRef.current,
+        elements,
+        style: [
+          {
+            selector: 'node',
+            style: {
+              'background-color': '#ffffff',
+              'border-color': '#4f6ef7',
+              'border-width': 1.5,
+              'color': '#1a1d2e',
+              'font-size': 9,
+              'font-family': 'JetBrains Mono, monospace',
+              'label': 'data(id)',
+              'text-valign': 'center',
+              'text-halign': 'center',
+              'text-wrap': 'wrap',
+              'width': 90,
+              'height': 44,
+              'shape': 'round-rectangle',
+            },
           },
-        },
-        {
-          selector: 'edge',
-          style: {
-            'width': 1.5,
-            'line-color': '#353d52',
-            'target-arrow-color': '#353d52',
-            'target-arrow-shape': 'triangle',
-            'curve-style': 'bezier',
+          {
+            selector: 'edge',
+            style: {
+              'width': 1.5,
+              'line-color': '#c8cedf',
+              'target-arrow-color': '#4f6ef7',
+              'target-arrow-shape': 'triangle',
+              'curve-style': 'bezier',
+            },
           },
-        },
-        {
-          selector: ':selected',
-          style: { 'background-color': '#6c8dfa', 'color': 'white' },
-        },
-      ],
-      layout: { name: 'breadthfirst', directed: true, spacingFactor: 1.4 } as cytoscape.LayoutOptions,
-    });
+          {
+            selector: ':selected',
+            style: { 'background-color': '#4f6ef7', 'color': 'white' },
+          },
+        ],
+        layout: { name: 'breadthfirst', directed: true, spacingFactor: 1.6, padding: 30 } as cytoscape.LayoutOptions,
+        userZoomingEnabled: true,
+        userPanningEnabled: true,
+      });
+    } catch (e) {
+      console.warn('CFGView render error:', e);
+    }
 
     return () => { cyRef.current?.destroy(); };
   }, [blocks]);

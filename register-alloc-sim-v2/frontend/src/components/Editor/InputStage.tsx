@@ -90,7 +90,7 @@ export default function InputStage() {
           language={language === 'cpp' ? 'cpp' : 'c'}
           value={source}
           onChange={(v) => setSource(v ?? '')}
-          theme="vs-dark"
+          theme="vs"
           options={{
             fontSize: 13,
             fontFamily: 'JetBrains Mono, Fira Code, monospace',
@@ -99,6 +99,7 @@ export default function InputStage() {
             lineNumbers: 'on',
             renderLineHighlight: 'line',
             padding: { top: 12, bottom: 12 },
+            scrollbar: { verticalScrollbarSize: 6, horizontalScrollbarSize: 6 },
           }}
         />
       </div>
@@ -139,7 +140,7 @@ export default function InputStage() {
               style={{ width: 140 }}
             />
             <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-              registers for custom algorithms
+              registers for custom GC/LinScan only (LLVM uses target registers)
             </span>
           </div>
         </div>

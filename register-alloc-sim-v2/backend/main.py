@@ -71,7 +71,7 @@ async def allocate(req: AllocateRequest):
     # LLVM allocators
     llvm_allocators = [a for a in req.allocators if a in ("greedy", "fast", "basic")]
     for alloc_name in llvm_allocators:
-        asm, _dbg, stats_text, rc = run_llc(req.ir, regalloc=alloc_name)
+        asm, stats_text, rc = run_llc(req.ir, regalloc=alloc_name)
         if rc != 0:
             # Still include partial result
             results[alloc_name] = AllocatorResult(
@@ -116,10 +116,15 @@ async def allocate(req: AllocateRequest):
             gc_result = chaitin_briggs(nodes, edges, k=req.num_registers)
             # Build a pseudo-assembly string for display
             asm_lines = [f"# Chaitin-Briggs Graph Coloring (k={req.num_registers})"]
+            asm_lines.append(f"# {len(nodes)} variables, {len(edges)} interference edges")
+            asm_lines.append("")
+            asm_lines.append("# Register assignments:")
             for var, reg in gc_result["registerMap"].items():
-                asm_lines.append(f"  {var:20s}  →  {reg}")
+                if reg != "spilled":
+                    asm_lines.append(f"  {var:20s}  →  {reg}")
             if gc_result["spills"]:
-                asm_lines.append("\n# Spilled variables:")
+                asm_lines.append("")
+                asm_lines.append("# Spilled variables:")
                 for s in gc_result["spills"]:
                     asm_lines.append(f"  {s}  (spilled to memory)")
             results["custom_gc"] = AllocatorResult(
@@ -130,16 +135,22 @@ async def allocate(req: AllocateRequest):
                 registerCount=gc_result["registerCount"],
                 instructionCount=0,
                 rawStats=f"{len(gc_result['steps'])} algorithm steps recorded",
+                steps=gc_result["steps"],
             )
 
         if "custom_ls" in req.allocators:
             intervals = compute_live_intervals(blocks)
             ls_result = linear_scan(intervals, k=req.num_registers)
-            asm_lines = [f"# Linear Scan (Poletto-Sarkar, k={req.num_registers})"]
+            asm_lines = [f"# Linear Scan — Poletto-Sarkar (k={req.num_registers})"]
+            asm_lines.append(f"# {len(intervals)} live intervals")
+            asm_lines.append("")
+            asm_lines.append("# Register assignments:")
             for var, reg in ls_result["registerMap"].items():
-                asm_lines.append(f"  {var:20s}  →  {reg}")
+                if reg != "spilled":
+                    asm_lines.append(f"  {var:20s}  →  {reg}")
             if ls_result["spills"]:
-                asm_lines.append("\n# Spilled variables:")
+                asm_lines.append("")
+                asm_lines.append("# Spilled variables:")
                 for s in ls_result["spills"]:
                     asm_lines.append(f"  {s}  (spilled to memory)")
             results["custom_ls"] = AllocatorResult(
@@ -150,6 +161,8 @@ async def allocate(req: AllocateRequest):
                 registerCount=ls_result["registerCount"],
                 instructionCount=0,
                 rawStats=f"{len(ls_result['steps'])} algorithm steps recorded",
+                steps=ls_result["steps"],
+                intervals=ls_result["intervals"],
             )
 
     return AllocateResponse(results=results)
@@ -206,3 +219,7 @@ async def get_presets():
 @app.get("/health")
 async def health():
     return {"status": "ok", "version": "2.0.0"}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)

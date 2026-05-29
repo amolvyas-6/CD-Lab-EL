@@ -37,6 +37,10 @@ class AllocatorResult(BaseModel):
     registerCount: int
     instructionCount: int
     rawStats: str = ""
+    # Detailed algorithm step data (for custom allocators)
+    steps: List[Dict[str, Any]] = []
+    # Live interval data (for linear scan Gantt chart)
+    intervals: List[Dict[str, Any]] = []
 
 
 class AllocateResponse(BaseModel):

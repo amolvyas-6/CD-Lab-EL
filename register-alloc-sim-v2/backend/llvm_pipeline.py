@@ -79,18 +79,20 @@ def optimise_ir(unopt_ir: str) -> Tuple[str, str, int]:
         return ir, stderr, rc
 
 
-def run_llc(ir: str, regalloc: str = "greedy") -> Tuple[str, str, str, int]:
+def run_llc(ir: str, regalloc: str = "greedy") -> Tuple[str, str, int]:
     """
     Run llc with a specific register allocator.
 
     llc -regalloc=<name> -stats <ir> -o <out.s>
 
-    Returns: (assembly, debug_stats, stderr, returncode)
+    Returns: (assembly, stats_stderr, returncode)
+
+    Note: llc emits both compilation diagnostics and -stats output to stderr.
+    We return the full stderr which contains the stats lines.
     """
     with tempfile.TemporaryDirectory() as tmpdir:
         in_path = os.path.join(tmpdir, "input.ll")
         out_path = os.path.join(tmpdir, f"{regalloc}.s")
-        stats_path = os.path.join(tmpdir, "stats.txt")
         with open(in_path, "w") as f:
             f.write(ir)
 
@@ -108,4 +110,4 @@ def run_llc(ir: str, regalloc: str = "greedy") -> Tuple[str, str, str, int]:
             with open(out_path) as f:
                 asm = f.read()
 
-        return asm, stderr, stderr, rc  # stats are in stderr for llc -stats
+        return asm, stderr, rc

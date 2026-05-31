@@ -152,8 +152,7 @@ The `tests/` directory contains 4 test files with 20+ individual tests:
 Run all tests:
 ```bash
 cd backend
-pip install pytest
-pytest ../tests/ -v
+uv run pytest ../tests/ -v
 ```
 
 ## 6. Comparison: Graph Coloring vs Linear Scan
@@ -166,18 +165,3 @@ pytest ../tests/ -v
 | Implementation      | More complex (graph operations) | Simpler (sorted intervals)   |
 | JIT suitability     | Too slow for JIT                | Ideal for JIT compilers      |
 | Visualization       | Interference graph coloring     | Gantt-chart timeline         |
-
-## 7. References
-
-[1] A. V. Aho, M. S. Lam, R. Sethi, J. D. Ullman, *Compilers: Principles,
-    Techniques, and Tools*, 2nd ed. Addison-Wesley, 2006.
-[2] C. Lattner and V. Adve, "LLVM: A compilation framework for lifelong
-    program analysis & transformation," CGO 2004.
-[3] G. J. Chaitin et al., "Register allocation via coloring," *Computer
-    Languages*, vol. 6, pp. 47-57, 1981.
-[4] M. Poletto and V. Sarkar, "Linear scan register allocation," *ACM
-    TOPLAS*, vol. 21, no. 5, pp. 895-913, 1999.
-[5] P. Briggs, K. D. Cooper, L. Torczon, "Improvements to graph coloring
-    register allocation," *ACM TOPLAS*, vol. 16, no. 3, pp. 428-455, 1994.
-[6] C. Wimmer and M. Franz, "Linear scan register allocation on SSA form,"
-    CGO 2010.

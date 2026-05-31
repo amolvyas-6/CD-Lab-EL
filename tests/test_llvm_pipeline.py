@@ -34,7 +34,7 @@ def test_optimise_ir():
 def test_llc_greedy():
     ir, _, _ = compile_to_ir(SIMPLE_C)
     opt_ir, _, _ = optimise_ir(ir)
-    asm, _dbg, _stats, rc = run_llc(opt_ir, "greedy")
+    asm, _stderr, rc = run_llc(opt_ir, "greedy")
     assert rc == 0
     assert len(asm) > 0
 
@@ -43,7 +43,7 @@ def test_llc_greedy():
 def test_llc_fast():
     ir, _, _ = compile_to_ir(SIMPLE_C)
     opt_ir, _, _ = optimise_ir(ir)
-    asm, _dbg, _stats, rc = run_llc(opt_ir, "fast")
+    asm, _stderr, rc = run_llc(opt_ir, "fast")
     assert rc == 0
 
 

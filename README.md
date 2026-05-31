@@ -132,25 +132,13 @@ register-alloc-sim-v2/
 ## Tests
 
 ```bash
-# Run all tests
+# Run all tests (from the backend directory)
 cd backend
-pip install pytest
-pytest ../tests/ -v
+uv run pytest ../tests/ -v
 
 # Or individually
-python ../tests/test_graph_coloring.py
-python ../tests/test_linear_scan.py
-python ../tests/test_liveness.py
-python ../tests/test_llvm_pipeline.py   # requires clang + llc
+uv run python ../tests/test_graph_coloring.py
+uv run python ../tests/test_linear_scan.py
+uv run python ../tests/test_liveness.py
+uv run python ../tests/test_llvm_pipeline.py   # requires clang + llc
 ```
-
----
-
-## References
-
-[1] A. V. Aho et al., *Compilers: Principles, Techniques, and Tools*, 2nd ed. Addison-Wesley, 2006.
-[2] C. Lattner and V. Adve, "LLVM: A compilation framework…", CGO 2004.
-[3] G. J. Chaitin et al., "Register allocation via coloring," *Computer Languages*, 1981.
-[4] M. Poletto and V. Sarkar, "Linear scan register allocation," *TOPLAS*, 1999.
-[5] P. Briggs et al., "Improvements to graph coloring register allocation," *TOPLAS*, 1994.
-[6] C. Wimmer and M. Franz, "Linear scan register allocation on SSA form," CGO 2010.
